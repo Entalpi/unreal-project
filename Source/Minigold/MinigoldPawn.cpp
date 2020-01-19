@@ -14,7 +14,7 @@
 #include "Sound/SoundBase.h"
 
 const FName AMinigoldPawn::MoveForwardBinding("MoveForward");
-const FName AMinigoldPawn::MoveRightBinding("MoveRight");
+const FName AMinigoldPawn::MoveTurnBinding("MoveTurn");
 const FName AMinigoldPawn::FireForwardBinding("FireForward");
 const FName AMinigoldPawn::FireRightBinding("FireRight");
 
@@ -34,7 +34,7 @@ AMinigoldPawn::AMinigoldPawn()
 	// Create a camera boom...
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->SetUsingAbsoluteRotation(true); // Don't want arm to rotate when ship does
+	CameraBoom->SetUsingAbsoluteRotation(false); // Want arm to rotate when ship does
 	CameraBoom->TargetArmLength = 1200.f;
 	CameraBoom->SetRelativeRotation(FRotator(-80.f, 0.f, 0.f));
 	CameraBoom->bDoCollisionTest = false; // Don't want to pull camera in when it collides with level
@@ -58,7 +58,7 @@ void AMinigoldPawn::SetupPlayerInputComponent(class UInputComponent* PlayerInput
 
 	// set up gameplay key bindings
 	PlayerInputComponent->BindAxis(MoveForwardBinding);
-	PlayerInputComponent->BindAxis(MoveRightBinding);
+	PlayerInputComponent->BindAxis(MoveTurnBinding);
 	PlayerInputComponent->BindAxis(FireForwardBinding);
 	PlayerInputComponent->BindAxis(FireRightBinding);
 }
@@ -67,13 +67,17 @@ void AMinigoldPawn::Tick(float DeltaSeconds)
 {
 	// Find movement direction
 	const float ForwardValue = GetInputAxisValue(MoveForwardBinding);
-	const float RightValue = GetInputAxisValue(MoveRightBinding);
+	const float TurningValue = GetInputAxisValue(MoveTurnBinding);
 
-	// Clamp max size so that (X=1, Y=1) doesn't cause faster movement in diagonal directions
-	const FVector MoveDirection = FVector(ForwardValue, RightValue, 0.f).GetClampedToMaxSize(1.0f);
+	// Rotate 
+	const float Pitch = 0.0f;
+	const float Yaw = TurningValue;
+	const float Roll = 0.0;
+	const FRotator DeltaRotation = FRotator(Pitch, Yaw, Roll);
+	RootComponent->AddLocalRotation(DeltaRotation);
 
-	// Calculate  movement
-	const FVector Movement = MoveDirection * MoveSpeed * DeltaSeconds;
+	// Calculate movement
+	const FVector Movement = GetActorForwardVector() * ForwardValue * MoveSpeed * DeltaSeconds;
 
 	// If non-zero size, move this actor
 	if (Movement.SizeSquared() > 0.0f)

@@ -26,6 +26,9 @@ class AMinigoldPawn : public APawn
 public:
 	AMinigoldPawn();
 
+	UPROPERTY(Category = Gameplay, EditAnywhere, BlueprintReadWrite)
+    FVector ForwardGun;
+
 	/** Offset from the ships location to spawn projectiles */
 	UPROPERTY(Category = Gameplay, EditAnywhere, BlueprintReadWrite )
 	FVector GunOffset;
@@ -55,7 +58,7 @@ public:
 
 	// Static names for axis bindings
 	static const FName MoveForwardBinding;
-	static const FName MoveRightBinding;
+	static const FName MoveTurnBinding;
 	static const FName FireForwardBinding;
 	static const FName FireRightBinding;
 
