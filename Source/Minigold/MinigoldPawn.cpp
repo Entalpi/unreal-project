@@ -20,22 +20,26 @@ const FName AMinigoldPawn::FireRightBinding("FireRight");
 
 AMinigoldPawn::AMinigoldPawn()
 {	
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> ShipMesh(TEXT("/Game/TwinStick/Meshes/TwinStickUFO.TwinStickUFO"));
 	// Create the mesh component
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> ShipMesh(TEXT("/Game/Goldship/Models/ship_light_ship_light_8angles.ship_light_ship_light_8angles"));
 	ShipMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShipMesh"));
 	RootComponent = ShipMeshComponent;
 	ShipMeshComponent->SetCollisionProfileName(UCollisionProfile::Pawn_ProfileName);
 	ShipMeshComponent->SetStaticMesh(ShipMesh.Object);
+
+	// Create sails
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> ShipSailsMesh(TEXT("/Game/Goldship/Models/ship_light_sails"));
+    const auto SailsMesh =  CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShipSailsMesh"));
 	
 	// Cache our sound effect
-	static ConstructorHelpers::FObjectFinder<USoundBase> FireAudio(TEXT("/Game/TwinStick/Audio/TwinStickFire.TwinStickFire"));
+	static ConstructorHelpers::FObjectFinder<USoundBase> FireAudio(TEXT("/Game/Goldship/Audio/TwinStickFire.TwinStickFire"));
 	FireSound = FireAudio.Object;
 
 	// Create a camera boom...
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
 	CameraBoom->SetUsingAbsoluteRotation(false); // Want arm to rotate when ship does
-	CameraBoom->TargetArmLength = 1200.f;
+	CameraBoom->TargetArmLength = 1400.f;
 	CameraBoom->SetRelativeRotation(FRotator(-80.f, 0.f, 0.f));
 	CameraBoom->bDoCollisionTest = false; // Don't want to pull camera in when it collides with level
 
@@ -74,33 +78,20 @@ void AMinigoldPawn::Tick(float DeltaSeconds)
 	const float Yaw = TurningValue;
 	const float Roll = 0.0;
 	const FRotator DeltaRotation = FRotator(Pitch, Yaw, Roll);
-	RootComponent->AddLocalRotation(DeltaRotation);
+	RootComponent->AddWorldRotation(DeltaRotation);
 
 	// Calculate movement
-	const FVector Movement = GetActorForwardVector() * ForwardValue * MoveSpeed * DeltaSeconds;
-
-	// If non-zero size, move this actor
-	if (Movement.SizeSquared() > 0.0f)
-	{
-		const FRotator NewRotation = Movement.Rotation();
-		FHitResult Hit(1.f);
-		RootComponent->MoveComponent(Movement, NewRotation, true, &Hit);
-		
-		if (Hit.IsValidBlockingHit())
-		{
-			const FVector Normal2D = Hit.Normal.GetSafeNormal2D();
-			const FVector Deflection = FVector::VectorPlaneProject(Movement, Normal2D) * (1.f - Hit.Time);
-			RootComponent->MoveComponent(Deflection, NewRotation, true);
-		}
-	}
+	const FVector Movement = -GetActorRightVector() * ForwardValue * MoveSpeed * DeltaSeconds;
+	FHitResult Hit(1.f);
+	RootComponent->AddWorldOffset(Movement, true, &Hit); // Sweep = collision detection
 	
-	// Create fire direction vector
-	const float FireForwardValue = GetInputAxisValue(FireForwardBinding);
-	const float FireRightValue = GetInputAxisValue(FireRightBinding);
-	const FVector FireDirection = FVector(FireForwardValue, FireRightValue, 0.f);
-
-	// Try and fire a shot
-	FireShot(FireDirection);
+	if (Hit.IsValidBlockingHit())
+	{
+		// UE_LOG(LogTemp, Warning, TEXT("Hit true"));
+		const FVector Normal2D = Hit.Normal.GetSafeNormal2D();
+		const FVector Deflection = FVector::VectorPlaneProject(Movement, Normal2D) * (1.f - Hit.Time);
+		RootComponent->AddRelativeLocation(Deflection);
+	}
 }
 
 void AMinigoldPawn::FireShot(FVector FireDirection)
