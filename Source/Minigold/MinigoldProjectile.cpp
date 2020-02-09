@@ -18,6 +18,7 @@ AMinigoldProjectile::AMinigoldProjectile()
 	ProjectileMesh->SetupAttachment(RootComponent);
 	ProjectileMesh->BodyInstance.SetCollisionProfileName("Projectile");
 	ProjectileMesh->OnComponentHit.AddDynamic(this, &AMinigoldProjectile::OnHit);		// set up a notification for when this component hits something
+	// ProjectileMesh->SetMaterialByName(TEXT("iron"), nullptr);
 	RootComponent = ProjectileMesh;
 
 	// Use a ProjectileMovementComponent to govern this projectile's movement
@@ -30,7 +31,7 @@ AMinigoldProjectile::AMinigoldProjectile()
 	ProjectileMovement->ProjectileGravityScale = 0.f; // No gravity
 
 	// Die after 3 seconds by default
-	InitialLifeSpan = 3.0f;
+	InitialLifeSpan = 0.0f;
 }
 
 void AMinigoldProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)

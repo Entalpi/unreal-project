@@ -15,8 +15,7 @@
 
 const FName AMinigoldPawn::MoveForwardBinding("MoveForward");
 const FName AMinigoldPawn::MoveTurnBinding("MoveTurn");
-const FName AMinigoldPawn::FireForwardBinding("FireForward");
-const FName AMinigoldPawn::FireRightBinding("FireRight");
+const FName AMinigoldPawn::FireBinding("FireCannons");
 
 AMinigoldPawn::AMinigoldPawn()
 {	
@@ -63,8 +62,7 @@ void AMinigoldPawn::SetupPlayerInputComponent(class UInputComponent* PlayerInput
 	// set up gameplay key bindings
 	PlayerInputComponent->BindAxis(MoveForwardBinding);
 	PlayerInputComponent->BindAxis(MoveTurnBinding);
-	PlayerInputComponent->BindAxis(FireForwardBinding);
-	PlayerInputComponent->BindAxis(FireRightBinding);
+	PlayerInputComponent->BindAction(FireBinding, IE_Pressed, this, &AMinigoldPawn::FireShot);
 }
 
 void AMinigoldPawn::Tick(float DeltaSeconds)
@@ -83,47 +81,46 @@ void AMinigoldPawn::Tick(float DeltaSeconds)
 	// Calculate movement
 	const FVector Movement = -GetActorRightVector() * ForwardValue * MoveSpeed * DeltaSeconds;
 	FHitResult Hit(1.f);
-	RootComponent->AddWorldOffset(Movement, true, &Hit); // Sweep = collision detection
+	const bool sweep = true;
+	RootComponent->AddWorldOffset(Movement, sweep, &Hit); // Sweep = collision detection
 	
 	if (Hit.IsValidBlockingHit())
 	{
-		// UE_LOG(LogTemp, Warning, TEXT("Hit true"));
 		const FVector Normal2D = Hit.Normal.GetSafeNormal2D();
 		const FVector Deflection = FVector::VectorPlaneProject(Movement, Normal2D) * (1.f - Hit.Time);
 		RootComponent->AddRelativeLocation(Deflection);
 	}
 }
 
-void AMinigoldPawn::FireShot(FVector FireDirection)
+void AMinigoldPawn::FireShot()
 {
+	UE_LOG(LogTemp, Warning, TEXT("Yeah boi!"));
+
 	// If it's ok to fire again
 	if (bCanFire == true)
 	{
-		// If we are pressing fire stick in a direction
-		if (FireDirection.SizeSquared() > 0.0f)
+		const FRotator FireRotation = FRotator(0.0f, 0.0f, 0.0f);
+		// Spawn projectile at an offset from this pawn
+		const FVector SpawnLocation = GetActorLocation() + FireRotation.RotateVector(GunOffset);
+		// UE_LOG(LogTemp, Warning, "%s", GetActorLocation());
+
+		UWorld* const World = GetWorld();
+		if (World != NULL)
 		{
-			const FRotator FireRotation = FireDirection.Rotation();
-			// Spawn projectile at an offset from this pawn
-			const FVector SpawnLocation = GetActorLocation() + FireRotation.RotateVector(GunOffset);
-
-			UWorld* const World = GetWorld();
-			if (World != NULL)
-			{
-				// spawn the projectile
-				World->SpawnActor<AMinigoldProjectile>(SpawnLocation, FireRotation);
-			}
-
-			bCanFire = false;
-			World->GetTimerManager().SetTimer(TimerHandle_ShotTimerExpired, this, &AMinigoldPawn::ShotTimerExpired, FireRate);
-
-			// try and play the sound if specified
-			if (FireSound != nullptr)
-			{
-				UGameplayStatics::PlaySoundAtLocation(this, FireSound, GetActorLocation());
-			}
-
-			bCanFire = false;
+			// spawn the projectile
+			World->SpawnActor<AMinigoldProjectile>(SpawnLocation, FireRotation);
 		}
+
+		bCanFire = false;
+		World->GetTimerManager().SetTimer(TimerHandle_ShotTimerExpired, this, &AMinigoldPawn::ShotTimerExpired, FireRate);
+
+		// try and play the sound if specified
+		if (FireSound != nullptr)
+		{
+			UGameplayStatics::PlaySoundAtLocation(this, FireSound, GetActorLocation());
+		}
+
+		bCanFire = false;
 	}
 }
 

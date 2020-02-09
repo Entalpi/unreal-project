@@ -51,7 +51,7 @@ public:
 	// End Actor Interface
 
 	/* Fire a shot in the specified direction */
-	void FireShot(FVector FireDirection);
+	void FireShot();
 
 	/* Handler for the fire timer expiry */
 	void ShotTimerExpired();
@@ -59,8 +59,7 @@ public:
 	// Static names for axis bindings
 	static const FName MoveForwardBinding;
 	static const FName MoveTurnBinding;
-	static const FName FireForwardBinding;
-	static const FName FireRightBinding;
+	static const FName FireBinding;
 
 private:
 
