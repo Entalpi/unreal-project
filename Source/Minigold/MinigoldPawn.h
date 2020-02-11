@@ -26,11 +26,11 @@ class AMinigoldPawn : public APawn
 public:
 	AMinigoldPawn();
 
-	UPROPERTY(Category = Gameplay, EditAnywhere, BlueprintReadWrite)
-    FVector ForwardGun;
+	/** Current health of the ship */
+	uint32_t Health = 2;
 
 	/** Offset from the ships location to spawn projectiles */
-	UPROPERTY(Category = Gameplay, EditAnywhere, BlueprintReadWrite )
+	UPROPERTY(Category = Gameplay, EditAnywhere, BlueprintReadWrite)
 	FVector GunOffset;
 	
 	/* How fast the weapon will fire */
@@ -40,6 +40,10 @@ public:
 	/* The speed our ship moves around the level */
 	UPROPERTY(Category = Gameplay, EditAnywhere, BlueprintReadWrite)
 	float MoveSpeed;
+	
+	/* The speed our ship turns around */
+	UPROPERTY(Category = Gameplay, EditAnywhere, BlueprintReadWrite)
+	float TurnSpeed;
 
 	/** Sound to play each time we fire */
 	UPROPERTY(Category = Audio, EditAnywhere, BlueprintReadWrite)
@@ -48,6 +52,7 @@ public:
 	// Begin Actor Interface
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* InputComponent) override;
+	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, class AActor* DamageCauser) override;
 	// End Actor Interface
 
 	/* Fire a shot in the specified direction */
@@ -55,6 +60,8 @@ public:
 
 	/* Handler for the fire timer expiry */
 	void ShotTimerExpired();
+
+	FVector GetShipForwardVector() const;
 
 	// Static names for axis bindings
 	static const FName MoveForwardBinding;

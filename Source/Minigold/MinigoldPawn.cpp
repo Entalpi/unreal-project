@@ -12,47 +12,55 @@
 #include "Engine/StaticMesh.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
+#include <EngineGlobals.h>
+#include <Runtime/Engine/Classes/Engine/Engine.h>
 
 const FName AMinigoldPawn::MoveForwardBinding("MoveForward");
 const FName AMinigoldPawn::MoveTurnBinding("MoveTurn");
 const FName AMinigoldPawn::FireBinding("FireCannons");
 
+FVector AMinigoldPawn::GetShipForwardVector() const
+{
+	return -GetActorRightVector();
+}
+
 AMinigoldPawn::AMinigoldPawn()
 {	
-	// Create the mesh component
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> ShipMesh(TEXT("/Game/Goldship/Models/ship_light_ship_light_8angles.ship_light_ship_light_8angles"));
-	ShipMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShipMesh"));
-	RootComponent = ShipMeshComponent;
-	ShipMeshComponent->SetCollisionProfileName(UCollisionProfile::Pawn_ProfileName);
-	ShipMeshComponent->SetStaticMesh(ShipMesh.Object);
+	// FIXME: Set Ship at water level
+	SetActorLocation(FVector(0.0f, 0.0f, 125.0f));
 
-	// Create sails
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> ShipSailsMesh(TEXT("/Game/Goldship/Models/ship_light_sails"));
-    const auto SailsMesh =  CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShipSailsMesh"));
-	
 	// Cache our sound effect
 	static ConstructorHelpers::FObjectFinder<USoundBase> FireAudio(TEXT("/Game/Goldship/Audio/TwinStickFire.TwinStickFire"));
 	FireSound = FireAudio.Object;
 
-	// Create a camera boom...
-	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
-	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->SetUsingAbsoluteRotation(false); // Want arm to rotate when ship does
-	CameraBoom->TargetArmLength = 1400.f;
-	CameraBoom->SetRelativeRotation(FRotator(-80.f, 0.f, 0.f));
-	CameraBoom->bDoCollisionTest = false; // Don't want to pull camera in when it collides with level
+	// Mesh
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> ShipMesh(TEXT("/Game/Goldship/Models/ship_light"));
+	ShipMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShipMesh"));
+	ShipMeshComponent->SetWorldScale3D(FVector(1.0f));
+	ShipMeshComponent->SetCollisionProfileName(UCollisionProfile::Pawn_ProfileName);
+	ShipMeshComponent->SetStaticMesh(ShipMesh.Object);
+	SetRootComponent(ShipMeshComponent);
 
-	// Create a camera...
-	CameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("TopDownCamera"));
+	// Camera arm
+	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
+	CameraBoom->TargetArmLength = 2000.f;
+	CameraBoom->SetRelativeRotation(FRotator(-25.f, 270.f, 0.f)); 
+	CameraBoom->bDoCollisionTest = false; // Want to pull camera in when it collides with level
+	CameraBoom->SetupAttachment(RootComponent);
+
+	// Camera
+	CameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	CameraComponent->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
-	CameraComponent->bUsePawnControlRotation = false;	// Camera does not rotate relative to arm
 
 	// Movement
 	MoveSpeed = 1000.0f;
+	TurnSpeed = 0.75f;
 	// Weapon
-	GunOffset = FVector(90.f, 0.f, 0.f);
+	GunOffset = FVector(0.f, 90.f, 0.f);
 	FireRate = 0.1f;
 	bCanFire = true;
+
+	AutoPossessPlayer = EAutoReceiveInput::Player0;
 }
 
 void AMinigoldPawn::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
@@ -67,19 +75,24 @@ void AMinigoldPawn::SetupPlayerInputComponent(class UInputComponent* PlayerInput
 
 void AMinigoldPawn::Tick(float DeltaSeconds)
 {
+	if (Health == 0)
+	{
+		Destroy();
+	}
+
 	// Find movement direction
 	const float ForwardValue = GetInputAxisValue(MoveForwardBinding);
 	const float TurningValue = GetInputAxisValue(MoveTurnBinding);
 
 	// Rotate 
 	const float Pitch = 0.0f;
-	const float Yaw = TurningValue;
+	const float Yaw = TurnSpeed * TurningValue;
 	const float Roll = 0.0;
 	const FRotator DeltaRotation = FRotator(Pitch, Yaw, Roll);
 	RootComponent->AddWorldRotation(DeltaRotation);
 
 	// Calculate movement
-	const FVector Movement = -GetActorRightVector() * ForwardValue * MoveSpeed * DeltaSeconds;
+	const FVector Movement = GetShipForwardVector() * ForwardValue * MoveSpeed * DeltaSeconds;
 	FHitResult Hit(1.f);
 	const bool sweep = true;
 	RootComponent->AddWorldOffset(Movement, sweep, &Hit); // Sweep = collision detection
@@ -94,33 +107,26 @@ void AMinigoldPawn::Tick(float DeltaSeconds)
 
 void AMinigoldPawn::FireShot()
 {
-	UE_LOG(LogTemp, Warning, TEXT("Yeah boi!"));
-
-	// If it's ok to fire again
-	if (bCanFire == true)
+	if (bCanFire)
 	{
-		const FRotator FireRotation = FRotator(0.0f, 0.0f, 0.0f);
-		// Spawn projectile at an offset from this pawn
-		const FVector SpawnLocation = GetActorLocation() + FireRotation.RotateVector(GunOffset);
-		// UE_LOG(LogTemp, Warning, "%s", GetActorLocation());
-
 		UWorld* const World = GetWorld();
-		if (World != NULL)
-		{
-			// spawn the projectile
-			World->SpawnActor<AMinigoldProjectile>(SpawnLocation, FireRotation);
+		if (World)
+		{ 
+			// Forward cannon
+			const FRotator FireRotation = GetShipForwardVector().Rotation();
+			const FVector Offset = FVector(0.0f, 0.0f, 174.0f);
+			const FVector SpawnLocation = Offset + GetActorLocation() + GetShipForwardVector() * 550.0f;
+			const auto projectile = World->SpawnActor<AMinigoldProjectile>(SpawnLocation, FireRotation);
+
+			// Cooldown
+			bCanFire = false;
+			World->GetTimerManager().SetTimer(TimerHandle_ShotTimerExpired, this, &AMinigoldPawn::ShotTimerExpired, FireRate);
+
+			if (FireSound)
+			{
+				UGameplayStatics::PlaySoundAtLocation(this, FireSound, GetActorLocation());
+			}
 		}
-
-		bCanFire = false;
-		World->GetTimerManager().SetTimer(TimerHandle_ShotTimerExpired, this, &AMinigoldPawn::ShotTimerExpired, FireRate);
-
-		// try and play the sound if specified
-		if (FireSound != nullptr)
-		{
-			UGameplayStatics::PlaySoundAtLocation(this, FireSound, GetActorLocation());
-		}
-
-		bCanFire = false;
 	}
 }
 
@@ -129,3 +135,12 @@ void AMinigoldPawn::ShotTimerExpired()
 	bCanFire = true;
 }
 
+float AMinigoldPawn::TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, class AActor* DamageCauser)
+{
+	if (Health >= DamageAmount) 
+	{
+		Health -= static_cast<uint32_t>(DamageAmount);
+	}
+	GEngine->AddOnScreenDebugMessage(1, 5.0f, FColor::Red, FString::Printf(TEXT("Ship hp: %u"), Health));
+	return Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+}
