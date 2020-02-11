@@ -13,6 +13,8 @@ AMinigoldProjectile::AMinigoldProjectile()
 	// Static reference to the mesh to use for the projectile
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> ProjectileMeshAsset(TEXT("/Game/Goldship/Models/cannon_ball"));
 
+	// TODO: Cache detonation sound
+
 	// Create mesh component for the projectile sphere
 	ProjectileMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ProjectileMesh"));
 	ProjectileMesh->SetStaticMesh(ProjectileMeshAsset.Object);
@@ -31,8 +33,7 @@ AMinigoldProjectile::AMinigoldProjectile()
 	ProjectileMovement->bShouldBounce = false;
 	ProjectileMovement->ProjectileGravityScale = 0.40f; 
 
-	// Die after 3 seconds by default
-	InitialLifeSpan = 0.0f;
+	InitialLifeSpan = 4.0f;
 
 	// GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("Projectile spawned"));
 }
@@ -52,6 +53,7 @@ void AMinigoldProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor
 		{
 			FDamageEvent Event;
 			ship->TakeDamage(1.0f, Event, nullptr, this);
+			OtherComp->AddImpulseAtLocation(GetVelocity() * 20.0f, GetActorLocation());
 		}
 	}
 

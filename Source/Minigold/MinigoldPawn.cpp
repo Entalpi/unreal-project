@@ -14,6 +14,8 @@
 #include "Sound/SoundBase.h"
 #include <EngineGlobals.h>
 #include <Runtime/Engine/Classes/Engine/Engine.h>
+#include <math.h>
+#include <complex>
 
 const FName AMinigoldPawn::MoveForwardBinding("MoveForward");
 const FName AMinigoldPawn::MoveTurnBinding("MoveTurn");
@@ -21,13 +23,14 @@ const FName AMinigoldPawn::FireBinding("FireCannons");
 
 FVector AMinigoldPawn::GetShipForwardVector() const
 {
-	return -GetActorRightVector();
+	FVector Forward = -GetActorRightVector();
+	Forward.Z = 0.0f; // Movement is only allowed in X-Y-plane
+	return Forward;
 }
 
 AMinigoldPawn::AMinigoldPawn()
 {	
 	// FIXME: Set Ship at water level
-	SetActorLocation(FVector(0.0f, 0.0f, 125.0f));
 
 	// Cache our sound effect
 	static ConstructorHelpers::FObjectFinder<USoundBase> FireAudio(TEXT("/Game/Goldship/Audio/TwinStickFire.TwinStickFire"));
@@ -39,6 +42,7 @@ AMinigoldPawn::AMinigoldPawn()
 	ShipMeshComponent->SetWorldScale3D(FVector(1.0f));
 	ShipMeshComponent->SetCollisionProfileName(UCollisionProfile::Pawn_ProfileName);
 	ShipMeshComponent->SetStaticMesh(ShipMesh.Object);
+	ShipMeshComponent->SetSimulatePhysics(true);
 	SetRootComponent(ShipMeshComponent);
 
 	// Camera arm
@@ -80,6 +84,15 @@ void AMinigoldPawn::Tick(float DeltaSeconds)
 		Destroy();
 	}
 
+	// Simulate wave motion
+	static float Time = 0.0f; 
+	Time += DeltaSeconds;
+	const float Amplitude = 0.025f;
+	const float Pitching = Amplitude * std::sin(Time);
+	const float Rolling = Amplitude * std::cos(Time);
+	const FRotator Motions = FRotator(Pitching, 0.0f, Rolling);
+	// RootComponent->AddLocalRotation(Motions);
+
 	// Find movement direction
 	const float ForwardValue = GetInputAxisValue(MoveForwardBinding);
 	const float TurningValue = GetInputAxisValue(MoveTurnBinding);
@@ -87,7 +100,7 @@ void AMinigoldPawn::Tick(float DeltaSeconds)
 	// Rotate 
 	const float Pitch = 0.0f;
 	const float Yaw = TurnSpeed * TurningValue;
-	const float Roll = 0.0;
+	const float Roll = 0.0f;
 	const FRotator DeltaRotation = FRotator(Pitch, Yaw, Roll);
 	RootComponent->AddWorldRotation(DeltaRotation);
 
@@ -114,8 +127,8 @@ void AMinigoldPawn::FireShot()
 		{ 
 			// Forward cannon
 			const FRotator FireRotation = GetShipForwardVector().Rotation();
-			const FVector Offset = FVector(0.0f, 0.0f, 174.0f);
-			const FVector SpawnLocation = Offset + GetActorLocation() + GetShipForwardVector() * 550.0f;
+			const FVector CannonOffset = FVector(0.0f, 0.0f, 174.0f) + GetShipForwardVector() * 550.0f;
+			const FVector SpawnLocation = CannonOffset + GetActorLocation();
 			const auto projectile = World->SpawnActor<AMinigoldProjectile>(SpawnLocation, FireRotation);
 
 			// Cooldown
